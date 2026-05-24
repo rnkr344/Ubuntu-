@@ -1,0 +1,85 @@
+name: Build Redmi Note 11T 5G Ubuntu Touch Kernel
+
+on:
+  workflow_dispatch: # GitHub UI par "Run workflow" button dikhane ke liye
+
+jobs:
+  build-kernel:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Setup Build Environment
+      run: |
+        sudo apt update
+        sudo apt install -y bc bison build-essential cpio curl flex git libssl-dev libtinfo5 libncurses5-dev xz-utils liblz4-tool jq python2
+
+    - name: Download Proton Clang Toolchain
+      run: |
+        # Sahi complete repository URL add kiya gaya hai
+        git clone --depth=1 https://github.com $GITHUB_WORKSPACE/proton-clang
+
+    - name: Clone Kernel Source
+      run: |
+        # MediaTek evergo source ka sahi complete URL add kiya gaya hai
+        git clone --depth=1 -b master https://github.com $GITHUB_WORKSPACE/kernel
+
+    - name: Apply Minimal Halium Patches
+      run: |
+        cd $GITHUB_WORKSPACE/kernel
+        CONFIG_PATH="arch/arm64/configs"
+        mkdir -p $CONFIG_PATH
+        
+        echo "🛠️ Ubuntu Touch ke liye halium.config create ho rahi hai..."
+        cat << EOF > $CONFIG_PATH/halium.config
+        CONFIG_DEVTMPFS=y
+        CONFIG_FHANDLE=y
+        CONFIG_SYSVIPC=y
+        CONFIG_IPC_NS=y
+        CONFIG_NET_NS=y
+        CONFIG_PID_NS=y
+        CONFIG_USER_NS=y
+        CONFIG_UTS_NS=y
+        CONFIG_VT=y
+        EOF
+        
+        echo "✅ halium.config successfully generated!"
+
+    - name: Compile Kernel with Halium Patches
+      run: |
+        cd $GITHUB_WORKSPACE/kernel
+        mkdir -p out
+        
+        # Toolchain paths setup
+        export PATH="$GITHUB_WORKSPACE/proton-clang/bin:$PATH"
+        export ARCH=arm64
+        export SUBARCH=arm64
+        
+        # Base make flags
+        MAKE_FLAGS=(
+            O=out
+            CC=clang
+            CROSS_COMPILE=aarch64-linux-gnu-
+            CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+            LD=ld.lld
+        )
+        
+        echo "🔄 Config generate ho raha hai (evergo_defconfig + halium.config)..."
+        # Pehle base defconfig load karenge
+        make "${MAKE_FLAGS[@]}" evergo_defconfig
+        
+        # Halium configs ko final .config me append karenge
+        cat arch/arm64/configs/halium.config >> out/.config
+        
+        # Config ko refresh karenge naye options ke sath
+        make "${MAKE_FLAGS[@]}" olddefconfig
+        
+        echo "🚀 Kernel compilation start ho rahi hai..."
+        make -j$(nproc --all) "${MAKE_FLAGS[@]}"
+
+    - name: Upload Ubuntu Touch Kernel Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: Ubuntu-Touch-Kernel-evergo
+        path: |
+          kernel/out/arch/arm64/boot/Image.gz
+          kernel/out/arch/arm64/boot/dtb.img
