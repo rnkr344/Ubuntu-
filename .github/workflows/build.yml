@@ -5,22 +5,35 @@ on:
 
 jobs:
   build-kernel:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
 
     steps:
+    - name: Setup Legacy Dependencies (libtinfo5 & Python 2)
+      run: |
+        sudo apt update
+        # 1. Fetch and install legacy libtinfo5 manually for Ubuntu 24.04
+        wget http://security.ubuntu.com/ubuntu/pool/universe/n/ncurses/libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        sudo apt install -y ./libtinfo5_6.3-2ubuntu0.1_amd64.deb
+        
+        # 2. Install Python 2 via a standalone miniconda environment and link it globally
+        wget https://anaconda.com -O miniconda.sh
+        bash miniconda.sh -b -p $HOME/miniconda
+        $HOME/miniconda/bin/conda create -y -n py27 python=2.7
+        sudo ln -sf $HOME/miniconda/envs/py27/bin/python /usr/bin/python2
+
     - name: Setup Build Environment
       run: |
         sudo apt update
-        sudo apt install -y bc bison build-essential cpio curl flex git libssl-dev libtinfo5 libncurses5-dev xz-utils liblz4-tool jq python2
+        # Installs all required dependencies except python2 and libtinfo5 which are handled above
+        sudo apt install -y bc bison build-essential cpio curl flex git libssl-dev libncurses5-dev xz-utils liblz4-tool jq
 
     - name: Download Proton Clang Toolchain
       run: |
-        # Sahi complete repository URL add kiya gaya hai
         git clone --depth=1 https://github.com $GITHUB_WORKSPACE/proton-clang
 
     - name: Clone Kernel Source
       run: |
-        # MediaTek evergo source ka sahi complete URL add kiya gaya hai
+        # MediaTek evergo source clone kiya ja raha hai
         git clone --depth=1 -b master https://github.com $GITHUB_WORKSPACE/kernel
 
     - name: Apply Minimal Halium Patches
