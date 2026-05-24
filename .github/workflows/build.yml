@@ -35,13 +35,12 @@ jobs:
 
     - name: Download Proton Clang Toolchain
       run: |
-        # Sahi repository path use kiya gaya hai (Aap apni pasand ka clang toolchain branch badal sakte hain)
+        # Sahi repository path use kiya gaya hai
         git clone --depth=1 https://github.com/kdrag0n/proton-clang.git $GITHUB_WORKSPACE/proton-clang
 
     - name: Clone Kernel Source
       run: |
-        # NOTE: Apni exact working repo aur branch ka URL yahan dalein.
-        # Example ke liye standard MediaTek evergo repo template set kiya hai:
+        # MediaTek evergo repo source template
         git clone --depth=1 https://github.com/MiCode/Xiaomi_Kernel_OpenSource.git -b evergo-r-oss $GITHUB_WORKSPACE/kernel
 
     - name: Apply Minimal Halium Patches
@@ -65,6 +64,15 @@ jobs:
         
         echo "✅ halium.config successfully generated!"
 
+    # KERNEL BUILD RESUME CACHE INTERACTION CODE ADDED
+    - name: Cache Kernel Out Directory (Resume Feature)
+      uses: actions/cache@v4
+      with:
+        path: kernel/out
+        key: kernel-build-cache-${{ github.sha }}
+        restore-keys: |
+          kernel-build-cache-
+
     - name: Compile Kernel with Halium Patches
       run: |
         cd $GITHUB_WORKSPACE/kernel
@@ -74,7 +82,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # Base make flags (Sahi explicit GNU Assembler configure kiya hai taaki '-EL' error fix ho)
+        # Base make flags (Sahi explicit GNU Tools path map kiya hai taaki '-EL' error fix ho)
         MAKE_FLAGS=(
             O=out
             CC="$CLANG_DIR/bin/clang"
@@ -91,17 +99,18 @@ jobs:
             LLVM_IAS=0
         )
         
-        echo "🔄 Config generate ho raha hai (evergo_defconfig + halium.config)..."
-        # Pehle base defconfig load karenge
-        make "${MAKE_FLAGS[@]}" evergo_defconfig
+        # Agar purana built data out/.config me para hai toh hum use destroy nahi karenge (Resume function logic)
+        if [ ! -f "out/.config" ]; then
+            echo "🔄 Naya Config generate ho raha hai (evergo_defconfig + halium.config)..."
+            make "${MAKE_FLAGS[@]}" evergo_defconfig
+            ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/halium.config
+            make "${MAKE_FLAGS[@]}" olddefconfig
+        else
+            echo "📦 Purani build ka out/.config mil gaya hai! Wahan se compilation resume ho rahi hai..."
+            make "${MAKE_FLAGS[@]}" olddefconfig
+        fi
         
-        # Merge config script ka use karke official tarike se defconfig merge karein
-        ARCH=arm64 ./scripts/kconfig/merge_config.sh -O out out/.config arch/arm64/configs/halium.config
-        
-        # Config ko refresh karenge naye options ke sath
-        make "${MAKE_FLAGS[@]}" olddefconfig
-        
-        echo "🚀 Kernel compilation start ho rahi hai..."
+        echo "🚀 Kernel compilation start/resume ho rahi hai..."
         make -j$(nproc --all) "${MAKE_FLAGS[@]}"
 
     - name: Upload Ubuntu Touch Kernel Artifacts
