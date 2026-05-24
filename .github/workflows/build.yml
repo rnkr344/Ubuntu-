@@ -70,12 +70,11 @@ jobs:
         cd $GITHUB_WORKSPACE/kernel
         mkdir -p out
         
-        # FIX: Toolchain variables ko full path ke sath define kiya taaki system linker crash na ho
         CLANG_DIR="$GITHUB_WORKSPACE/proton-clang"
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # Base make flags (Proton Clang integrated standard variables with precise path)
+        # Base make flags (Fix kiya gaya unrecognized option '-EL' error ke liye)
         MAKE_FLAGS=(
             O=out
             CC="$CLANG_DIR/bin/clang"
@@ -87,6 +86,9 @@ jobs:
             OBJCOPY="$CLANG_DIR/bin/llvm-objcopy"
             OBJDUMP="$CLANG_DIR/bin/llvm-objdump"
             STRIP="$CLANG_DIR/bin/llvm-strip"
+            OBJSIZE="$CLANG_DIR/bin/llvm-size"
+            LLVM=1
+            LLVM_IAS=1
         )
         
         echo "🔄 Config generate ho raha hai (evergo_defconfig + halium.config)..."
