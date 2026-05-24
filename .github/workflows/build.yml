@@ -74,7 +74,7 @@ jobs:
         export ARCH=arm64
         export SUBARCH=arm64
         
-        # Base make flags (Fix kiya gaya unrecognized option '-EL' error ke liye)
+        # Base make flags (Sahi explicit GNU Assembler configure kiya hai taaki '-EL' error fix ho)
         MAKE_FLAGS=(
             O=out
             CC="$CLANG_DIR/bin/clang"
@@ -87,8 +87,8 @@ jobs:
             OBJDUMP="$CLANG_DIR/bin/llvm-objdump"
             STRIP="$CLANG_DIR/bin/llvm-strip"
             OBJSIZE="$CLANG_DIR/bin/llvm-size"
-            LLVM=1
-            LLVM_IAS=1
+            AS="$CLANG_DIR/bin/aarch64-linux-gnu-as"
+            LLVM_IAS=0
         )
         
         echo "🔄 Config generate ho raha hai (evergo_defconfig + halium.config)..."
